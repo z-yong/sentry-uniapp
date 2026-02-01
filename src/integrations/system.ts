@@ -1,91 +1,111 @@
-import { addGlobalEventProcessor, getCurrentHub } from "@sentry/core";
-import { Event, Integration } from "@sentry/types";
+import { defineIntegration, getClient } from '@sentry/core';
+import type { Client, Event, Integration, IntegrationFn } from '@sentry/core';
 
-import { appName as currentAppName, sdk } from "../crossPlatform";
-import { SDK_VERSION } from "../version";
+import { appName as currentAppName, sdk } from '../crossPlatform';
 
-/** UserAgent */
-export class System implements Integration {
-  /**
-   * @inheritDoc
-   */
-  public name: string = System.id;
+const INTEGRATION_NAME = 'System';
 
-  /**
-   * @inheritDoc
-   */
-  public static id: string = "System";
+interface SystemInfo {
+  batteryLevel?: number;
+  currentBattery?: number;
+  battery?: number;
+  brand?: string;
+  language?: string;
+  model?: string;
+  pixelRatio?: number;
+  platform?: string;
+  screenHeight?: number;
+  screenWidth?: number;
+  statusBarHeight?: number;
+  system?: string;
+  version?: string;
+  windowHeight?: number;
+  windowWidth?: number;
+  app?: string;
+  appName?: string;
+  fontSizeSetting?: number;
+  [key: string]: any;
+}
 
-  /**
-   * @inheritDoc
-   */
-  public setupOnce(): void {
-    addGlobalEventProcessor((event: Event) => {
-      if (getCurrentHub().getIntegration(System)) {
-        try {
-          const systemInfo = sdk.getSystemInfoSync()
+const _systemIntegration = (() => {
+  return {
+    name: INTEGRATION_NAME,
+    setupOnce() {
+      // No setup needed
+    },
+    processEvent(event: Event, _hint: unknown, _client: Client): Event {
+      try {
+        const systemInfo: SystemInfo = sdk.getSystemInfoSync();
 
-          const {
-            batteryLevel, // 微信小程序
-            currentBattery, // 支付宝小程序、 钉钉小程序
-            battery, // 字节跳动小程序
-            brand,
-            language,
-            model,
-            pixelRatio,
-            platform,
-            screenHeight,
-            screenWidth,
-            statusBarHeight,
-            system,
-            version,
-            windowHeight,
-            windowWidth,
-            app, // 支付宝小程序
-            appName, // 字节跳动小程序
-            fontSizeSetting, // 支付宝小程序、 钉钉小程序、微信小程序
-          } = systemInfo;
+        const {
+          batteryLevel,
+          currentBattery,
+          battery,
+          brand,
+          language,
+          model,
+          pixelRatio,
+          platform,
+          screenHeight,
+          screenWidth,
+          statusBarHeight,
+          system,
+          version,
+          windowHeight,
+          windowWidth,
+          app,
+          appName,
+          fontSizeSetting,
+        } = systemInfo;
 
-          // tslint:disable-next-line:variable-name
-          const SDKVersion = SDK_VERSION;
-          const [systemName, systemVersion] = system.split(" ");
+        const [systemName, systemVersion] = (system || '').split(' ');
 
-          return {
-            ...event,
-            contexts: {
-              ...event.contexts,
-              device: {
-                brand,
-                battery_level: batteryLevel || currentBattery || battery,
-                model,
-                screen_dpi: pixelRatio
-              },
-              os: {
-                name: systemName || system,
-                version: systemVersion || system
-              },
-              extra: {
-                SDKVersion,
-                language,
-                platform,
-                screenHeight,
-                screenWidth,
-                statusBarHeight,
-                version,
-                windowHeight,
-                windowWidth,
-                fontSizeSetting,
-                app: app || appName || currentAppName,
-                ...systemInfo,
-              }
-            }
-          };
-        } catch (e) {
-          console.warn(`sentry-uniapp get system info fail: ${e}`);
-        }
+        return {
+          ...event,
+          contexts: {
+            ...event.contexts,
+            device: {
+              ...event.contexts?.device,
+              brand,
+              battery_level: batteryLevel || currentBattery || battery,
+              model,
+              screen_dpi: pixelRatio,
+            },
+            os: {
+              ...event.contexts?.os,
+              name: systemName || system,
+              version: systemVersion || system,
+            },
+            app: {
+              ...event.contexts?.app,
+              app_name: app || appName || currentAppName,
+            },
+          },
+          extra: {
+            ...event.extra,
+            systemInfo: {
+              language,
+              platform,
+              screenHeight,
+              screenWidth,
+              statusBarHeight,
+              version,
+              windowHeight,
+              windowWidth,
+              fontSizeSetting,
+            },
+          },
+        };
+      } catch (e) {
+        // Silently fail if system info is not available
       }
 
       return event;
-    });
-  }
-}
+    },
+  } satisfies Integration;
+}) satisfies IntegrationFn;
+
+/**
+ * System integration - collects system information from the miniapp environment
+ */
+export const systemIntegration = defineIntegration(_systemIntegration);

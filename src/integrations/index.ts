@@ -1,7 +1,11 @@
-export { GlobalHandlers } from "./globalhandlers";
-export { TryCatch } from "./trycatch";
-export { LinkedErrors } from "./linkederrors";
+export { globalHandlersIntegration } from './globalhandlers';
+export { routerIntegration } from './router';
+export { systemIntegration } from './system';
 
-export { System } from "./system";
-export { Router } from "./router";
-export { IgnoreMpcrawlerErrors } from "./ignoreMpcrawlerErrors";
+// Re-export integrations from @sentry/core for convenience
+export {
+    inboundFiltersIntegration,
+    functionToStringIntegration,
+    linkedErrorsIntegration,
+    dedupeIntegration,
+} from '@sentry/core';

@@ -1,67 +1,53 @@
-import { addGlobalEventProcessor, getCurrentHub } from "@sentry/core";
-import { Event, Integration } from "@sentry/types";
+import { defineIntegration } from '@sentry/core';
+import type { Client, Event, Integration, IntegrationFn } from '@sentry/core';
 
 declare const getCurrentPages: any;
 
-/** JSDoc */
-interface RouterIntegrations {
+const INTEGRATION_NAME = 'Router';
+
+interface RouterOptions {
   enable?: boolean;
 }
 
-/** UserAgent */
-export class Router implements Integration {
-  /**
-   * @inheritDoc
-   */
-  public name: string = Router.id;
+const _routerIntegration = ((options: RouterOptions = {}) => {
+  const enable = options.enable !== false;
 
-  /**
-   * @inheritDoc
-   */
-  public static id: string = "Router";
+  return {
+    name: INTEGRATION_NAME,
+    setupOnce() {
+      // No setup needed
+    },
+    processEvent(event: Event, _hint: unknown, _client: Client): Event {
+      if (!enable) {
+        return event;
+      }
 
-  /** JSDoc */
-  private readonly _options: RouterIntegrations;
+      try {
+        const routers = getCurrentPages().map((route: { route: string; options: object }) => ({
+          route: route.route,
+          options: route.options,
+        }));
 
-  /**
-   * @inheritDoc
-   */
-  public constructor(options?: RouterIntegrations) {
-    this._options = {
-      enable: true,
-      ...options,
-    };
-  }
-
-  /**
-   * @inheritDoc
-   */
-  public setupOnce(): void {
-    addGlobalEventProcessor((event: Event) => {
-      if (getCurrentHub().getIntegration(Router)) {
-        if (this._options.enable) {
-          try {
-            const routers = getCurrentPages().map(
-              (route: { route: string; options: object }) => ({
-                route: route.route,
-                options: route.options,
-              })
-            );
-
-            return {
-              ...event,
-              extra: {
-                ...event.extra,
-                routers,
-              },
-            };
-          } catch (e) {
-            console.warn(`sentry-uniapp get router info fail: ${e}`);
-          }
-        }
+        return {
+          ...event,
+          contexts: {
+            ...event.contexts,
+            router: {
+              routes: routers,
+              current: routers[routers.length - 1],
+            },
+          },
+        };
+      } catch (e) {
+        // Silently fail if getCurrentPages is not available
       }
 
       return event;
-    });
-  }
-}
+    },
+  } satisfies Integration;
+}) satisfies IntegrationFn;
+
+/**
+ * Router integration - captures route information from the miniapp
+ */
+export const routerIntegration = defineIntegration(_routerIntegration);

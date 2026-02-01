@@ -1,54 +1,84 @@
-export {
+// Type exports
+// Type exports
+export type {
   Breadcrumb,
   BreadcrumbHint,
   Request,
   SdkInfo,
   Event,
   EventHint,
-  EventStatus,
   Exception,
-  Response,
-  Severity,
+  SeverityLevel,
   StackFrame,
   Stacktrace,
   Thread,
   User,
-} from "@sentry/types";
+  Session,
+} from '@sentry/core';
 
+// Core SDK exports
 export {
-  addGlobalEventProcessor,
   addBreadcrumb,
+  addEventProcessor,
+  captureCheckIn,
   captureException,
   captureEvent,
+  captureFeedback,
   captureMessage,
-  configureScope,
-  getHubFromCarrier,
-  getCurrentHub,
-  Hub,
-  Scope,
+  close,
+  continueTrace,
+  createTransport,
+  flush,
+  getClient,
+  getCurrentScope,
+  getGlobalScope,
+  getIsolationScope,
+  isInitialized,
+  lastEventId,
+  metrics,
   setContext,
   setExtra,
   setExtras,
   setTag,
   setTags,
   setUser,
-  withScope
-} from "@sentry/core";
+  startSession,
+  endSession,
+  startSpan,
+  startInactiveSpan,
+  startSpanManual,
+  withScope,
+  withIsolationScope,
+  captureConsoleIntegration,
+  debugIntegration,
+  dedupeIntegration,
+  extraErrorDataIntegration,
+  functionToStringIntegration,
+  inboundFiltersIntegration,
+  linkedErrorsIntegration,
+  moduleMetadataIntegration,
+  requestDataIntegration,
+  rewriteFramesIntegration,
+  sessionTimingIntegration,
+  zodErrorsIntegration,
+} from '@sentry/core';
 
-export { SDK_NAME, SDK_VERSION } from "./version";
+// SDK-specific exports
+export { init, showReportDialog } from './sdk';
+export { UniappClient } from './client';
+export type { UniappOptions, ReportDialogOptions } from './client';
+export { makeUniappTransport } from './transport';
+
+// Integrations
 export {
-  defaultIntegrations,
-  init,
-  lastEventId,
-  showReportDialog,
-  flush,
-  close,
-  wrap
-} from "./sdk";
-export { MiniappOptions } from "./backend";
-export { MiniappClient, ReportDialogOptions } from "./client";
+  globalHandlersIntegration,
+  systemIntegration,
+  routerIntegration,
+} from './integrations';
 
-import * as Integrations from "./integrations/index";
-import * as Transports from "./transports/index";
+// Version
+export { SDK_NAME, SDK_VERSION } from './version';
 
-export { Integrations, Transports };
+// Re-export integrations namespace for compatibility
+import * as Integrations from './integrations';
+export { Integrations };

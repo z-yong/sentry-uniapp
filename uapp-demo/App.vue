@@ -7,7 +7,7 @@ export default {
     console.log('App Launch');
     sentry.init({
       // __DSN__ 参考格式: https://8137b89b2d1c4e349da3a38dca80c5fe@sentry.io/1
-      dsn: '__DSN__',
+      dsn: 'https://25c181fa4b9875396c29fb0e0cb83f8b@o4508364745932800.ingest.de.sentry.io/4510810903216208',
       // extraOptions 主要是解决平台差异问题的，见下方说明
       // 非 APP 平台，可以不实用
       extraOptions: { onmemorywarning: false, onerror: false }

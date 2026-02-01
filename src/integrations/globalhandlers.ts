@@ -1,206 +1,147 @@
-import { getCurrentHub } from "@sentry/core";
-import { Integration } from "@sentry/types";
-import { logger } from "@sentry/utils";
+import { defineIntegration, captureException, captureMessage, getCurrentScope } from '@sentry/core';
+import type { Integration, IntegrationFn } from '@sentry/core';
+import { logger } from '@sentry/core';
 
-import { sdk } from "../crossPlatform";
+import { sdk } from '../crossPlatform';
 
-/** JSDoc */
-interface GlobalHandlersIntegrations {
-  onerror: boolean;
-  onunhandledrejection: boolean;
-  onpagenotfound: boolean;
-  onmemorywarning: boolean;
+const INTEGRATION_NAME = 'GlobalHandlers';
+
+interface GlobalHandlersOptions {
+  onerror?: boolean;
+  onunhandledrejection?: boolean;
+  onpagenotfound?: boolean;
+  onmemorywarning?: boolean;
 }
 
-/** Global handlers */
-export class GlobalHandlers implements Integration {
-  /**
-   * @inheritDoc
-   */
-  public name: string = GlobalHandlers.id;
+const _globalHandlersIntegration = ((options: GlobalHandlersOptions = {}) => {
+  const _options = {
+    onerror: true,
+    onunhandledrejection: true,
+    onpagenotfound: true,
+    onmemorywarning: true,
+    ...options,
+  };
 
-  /**
-   * @inheritDoc
-   */
-  public static id: string = "GlobalHandlers";
+  let _onErrorHandlerInstalled = false;
+  let _onUnhandledRejectionHandlerInstalled = false;
+  let _onPageNotFoundHandlerInstalled = false;
+  let _onMemoryWarningHandlerInstalled = false;
 
-  /** JSDoc */
-  private readonly _options: GlobalHandlersIntegrations;
-
-  /** JSDoc */
-  private _onErrorHandlerInstalled: boolean = false;
-
-  /** JSDoc */
-  private _onUnhandledRejectionHandlerInstalled: boolean = false;
-
-  /** JSDoc */
-  private _onPageNotFoundHandlerInstalled: boolean = false;
-
-  /** JSDoc */
-  private _onMemoryWarningHandlerInstalled: boolean = false;
-
-  /** JSDoc */
-  public constructor(options?: GlobalHandlersIntegrations) {
-    this._options = {
-      onerror: true,
-      onunhandledrejection: true,
-      onpagenotfound: true,
-      onmemorywarning: true,
-      ...options,
-    };
-  }
-
-  /** JSDoc */
-  public setExtraOptions(extraOptions?: any): void {
-    if (extraOptions) {
-      if (extraOptions.onerror !== undefined) {
-        this._options.onerror = !!extraOptions.onerror;
+  return {
+    name: INTEGRATION_NAME,
+    setup() {
+      if (_options.onerror) {
+        _installGlobalOnErrorHandler();
       }
-
-      if (extraOptions.onunhandledrejection !== undefined) {
-        this._options.onunhandledrejection = !!extraOptions.onunhandledrejection;
+      if (_options.onunhandledrejection) {
+        _installGlobalOnUnhandledRejectionHandler();
       }
-
-      if (extraOptions.onpagenotfound !== undefined) {
-        this._options.onpagenotfound = !!extraOptions.onpagenotfound;
+      if (_options.onpagenotfound) {
+        _installGlobalOnPageNotFoundHandler();
       }
-
-      if (extraOptions.onmemorywarning !== undefined) {
-        this._options.onmemorywarning = !!extraOptions.onmemorywarning;
+      if (_options.onmemorywarning) {
+        _installGlobalOnMemoryWarningHandler();
       }
-    }
-  }
+    },
+  } satisfies Integration;
 
-  /**
-   * @inheritDoc
-   */
-  public setupOnce(): void {
-    Error.stackTraceLimit = 50;
-
-    if (this._options.onerror) {
-      logger.log("Global Handler attached: onError");
-      this._installGlobalOnErrorHandler();
-    }
-
-    if (this._options.onunhandledrejection) {
-      logger.log("Global Handler attached: onunhandledrejection");
-      this._installGlobalOnUnhandledRejectionHandler();
-    }
-
-    if (this._options.onpagenotfound) {
-      logger.log("Global Handler attached: onPageNotFound");
-      this._installGlobalOnPageNotFoundHandler();
-    }
-
-    if (this._options.onmemorywarning) {
-      logger.log("Global Handler attached: onMemoryWarning");
-      this._installGlobalOnMemoryWarningHandler();
-    }
-  }
-
-  /** JSDoc */
-  private _installGlobalOnErrorHandler(): void {
-    if (this._onErrorHandlerInstalled) {
+  function _installGlobalOnErrorHandler(): void {
+    if (_onErrorHandlerInstalled || !sdk.onError) {
       return;
     }
 
-    if (!!sdk.onError) {
-      const currentHub = getCurrentHub();
-
-      // https://developers.weixin.qq.com/miniprogram/dev/api/base/app/app-event/wx.onError.html
-      sdk.onError((err: string | object) => {
-        // console.info("sentry-uniapp", err);
-        const error = typeof err === 'string' ? new Error(err) : err
-        currentHub.captureException(error);
+    sdk.onError((err: string | object) => {
+      const error = typeof err === 'string' ? new Error(err) : err;
+      captureException(error, {
+        mechanism: {
+          type: 'onerror',
+          handled: false,
+        },
       });
-    }
+    });
 
-    this._onErrorHandlerInstalled = true;
+    _onErrorHandlerInstalled = true;
+    logger.log('Global Handler attached: onError');
   }
 
-  /** JSDoc */
-  private _installGlobalOnUnhandledRejectionHandler(): void {
-    if (this._onUnhandledRejectionHandlerInstalled) {
+  function _installGlobalOnUnhandledRejectionHandler(): void {
+    if (_onUnhandledRejectionHandlerInstalled || !sdk.onUnhandledRejection) {
       return;
     }
 
-    if (!!sdk.onUnhandledRejection) {
-      const currentHub = getCurrentHub();
-      /** JSDoc */
-      interface OnUnhandledRejectionRes {
-        reason: string | object;
-        promise: Promise<any>;
+    sdk.onUnhandledRejection((res: { reason: string | object; promise: Promise<any> }) => {
+      const error = typeof res.reason === 'string' ? new Error(res.reason) : res.reason;
+      captureException(error, {
+        mechanism: {
+          type: 'onunhandledrejection',
+          handled: false,
+        },
+        data: { promise: res.promise },
+      });
+    });
+
+    _onUnhandledRejectionHandlerInstalled = true;
+    logger.log('Global Handler attached: onUnhandledRejection');
+  }
+
+  function _installGlobalOnPageNotFoundHandler(): void {
+    if (_onPageNotFoundHandlerInstalled || !sdk.onPageNotFound) {
+      return;
+    }
+
+    sdk.onPageNotFound((res: { path: string }) => {
+      const scope = getCurrentScope();
+      const url = res.path.split('?')[0];
+
+      scope.setTag('pagenotfound', url);
+      scope.setContext('pagenotfound', res);
+
+      captureMessage(`Page not found: ${url}`, {
+        level: 'warning',
+      });
+    });
+
+    _onPageNotFoundHandlerInstalled = true;
+    logger.log('Global Handler attached: onPageNotFound');
+  }
+
+  function _installGlobalOnMemoryWarningHandler(): void {
+    if (_onMemoryWarningHandlerInstalled || !sdk.onMemoryWarning) {
+      return;
+    }
+
+    sdk.onMemoryWarning(({ level = -1 }: { level: number }) => {
+      let levelMessage = 'Unknown memory warning level';
+
+      switch (level) {
+        case 5:
+          levelMessage = 'TRIM_MEMORY_RUNNING_MODERATE';
+          break;
+        case 10:
+          levelMessage = 'TRIM_MEMORY_RUNNING_LOW';
+          break;
+        case 15:
+          levelMessage = 'TRIM_MEMORY_RUNNING_CRITICAL';
+          break;
+        default:
+          return;
       }
 
-      // https://developers.weixin.qq.com/miniprogram/dev/api/base/app/app-event/wx.onUnhandledRejection.html
-      sdk.onUnhandledRejection(
-        ({ reason, promise }: OnUnhandledRejectionRes) => {
-          // console.log(reason, typeof reason, promise)
-          // 为什么官方文档上说 reason 是 string 类型，但是实际返回的确实 object 类型
-          const error = typeof reason === 'string' ? new Error(reason) : reason
-          currentHub.captureException(error, {
-            data: promise,
-          });
-        }
-      );
-    }
+      const scope = getCurrentScope();
+      scope.setTag('memory-warning', String(level));
+      scope.setContext('memory-warning', { level, levelMessage });
 
-    this._onUnhandledRejectionHandlerInstalled = true;
-  }
-
-  /** JSDoc */
-  private _installGlobalOnPageNotFoundHandler(): void {
-    if (this._onPageNotFoundHandlerInstalled) {
-      return;
-    }
-
-    if (!!sdk.onPageNotFound) {
-      const currentHub = getCurrentHub();
-
-      sdk.onPageNotFound((res: { path: string }) => {
-        const url = res.path.split("?")[0];
-
-        currentHub.setTag("pagenotfound", url);
-        currentHub.setExtra("message", JSON.stringify(res));
-        currentHub.captureMessage(`页面无法找到: ${url}`);
+      captureMessage('Memory warning', {
+        level: 'warning',
       });
-    }
+    });
 
-    this._onPageNotFoundHandlerInstalled = true;
+    _onMemoryWarningHandlerInstalled = true;
+    logger.log('Global Handler attached: onMemoryWarning');
   }
+}) satisfies IntegrationFn;
 
-  /** JSDoc */
-  private _installGlobalOnMemoryWarningHandler(): void {
-    if (this._onMemoryWarningHandlerInstalled) {
-      return;
-    }
-
-    if (!!sdk.onMemoryWarning) {
-      const currentHub = getCurrentHub();
-
-      sdk.onMemoryWarning(({ level = -1 }: { level: number }) => {
-        let levelMessage = "没有获取到告警级别信息";
-
-        switch (level) {
-          case 5:
-            levelMessage = "TRIM_MEMORY_RUNNING_MODERATE";
-            break;
-          case 10:
-            levelMessage = "TRIM_MEMORY_RUNNING_LOW";
-            break;
-          case 15:
-            levelMessage = "TRIM_MEMORY_RUNNING_CRITICAL";
-            break;
-          default:
-            return;
-        }
-
-        currentHub.setTag("memory-warning", String(level));
-        currentHub.setExtra("message", levelMessage);
-        currentHub.captureMessage(`内存不足告警`);
-      });
-    }
-
-    this._onMemoryWarningHandlerInstalled = true;
-  }
-}
+/**
+ * Global handlers integration - captures unhandled errors and rejections
+ */
+export const globalHandlersIntegration = defineIntegration(_globalHandlersIntegration);

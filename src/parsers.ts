@@ -1,5 +1,5 @@
-import { Event, Exception, StackFrame } from '@sentry/types';
-import { extractExceptionKeysForMessage, isEvent, normalizeToSize } from '@sentry/utils';
+import type { Event, Exception, StackFrame } from '@sentry/core';
+import { extractExceptionKeysForMessage, isEvent, normalizeToSize } from '@sentry/core';
 
 import { computeStackTrace, StackFrame as TraceKitStackFrame, StackTrace as TraceKitStackTrace } from './tracekit';
 
@@ -33,14 +33,19 @@ export function exceptionFromStacktrace(stacktrace: TraceKitStackTrace): Excepti
 /**
  * @hidden
  */
-export function eventFromPlainObject(exception: {}, syntheticException?: Error, rejection?: boolean): Event {
+export function eventFromPlainObject(
+  exception: {},
+  syntheticException?: Error | null,
+  rejection?: boolean,
+): Event {
   const event: Event = {
     exception: {
       values: [
         {
-          type: isEvent(exception) ? exception.constructor.name : rejection ? 'UnhandledRejection' : 'Error',
-          value: `Non-Error ${rejection ? 'promise rejection' : 'exception'
-            } captured with keys: ${extractExceptionKeysForMessage(exception)}`,
+          type: (exception instanceof Error) ? exception.name : rejection ? 'UnhandledRejection' : 'Error',
+          value: `Non-Error ${rejection ? 'promise rejection' : 'exception'} captured with keys: ${extractExceptionKeysForMessage(
+            exception,
+          )}`,
         },
       ],
     },
@@ -52,9 +57,9 @@ export function eventFromPlainObject(exception: {}, syntheticException?: Error, 
   if (syntheticException) {
     const stacktrace = computeStackTrace(syntheticException);
     const frames = prepareFramesForEvent(stacktrace.stack);
-    event.stacktrace = {
-      frames,
-    };
+    if (event.exception?.values?.[0]) {
+      event.exception.values[0].stacktrace = { frames: frames.reverse() };
+    }
   }
 
   return event;

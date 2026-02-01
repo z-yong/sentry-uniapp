@@ -1,16 +1,26 @@
 {
-  "extends": "./node_modules/@sentry/typescript/tsconfig.json",
   "include": [
     "src/**/*",
     "test/**/*"
   ],
   "exclude": [
-    "./examples"
+    "./examples",
+    "node_modules"
   ],
   "compilerOptions": {
+    "declaration": true,
+    "declarationMap": true,
     "outDir": "esm",
-    "module": "es6",
-    "target": "es5",
+    "module": "ESNext",
+    "target": "ES2018",
+    "lib": [
+      "ES2018"
+    ],
     "resolveJsonModule": true,
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "moduleResolution": "node",
+    "strict": false,
+    "skipLibCheck": true
   }
 }

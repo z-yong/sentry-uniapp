@@ -1,77 +1,91 @@
-import { Event } from '@sentry/types';
-import {
-  addExceptionMechanism,
-  addExceptionTypeValue,
-  isDOMError,
-  isDOMException,
-  isError,
-  isErrorEvent,
-  isEvent,
-  isPlainObject,
-} from '@sentry/utils';
+import type { Event, EventHint, Exception, SeverityLevel, StackFrame } from '@sentry/core';
+import { addExceptionMechanism, addExceptionTypeValue, extractExceptionKeysForMessage, normalizeToSize } from '@sentry/core';
 
-import { eventFromPlainObject, eventFromStacktrace, prepareFramesForEvent } from './parsers';
+import { exceptionFromStacktrace } from './parsers';
 import { computeStackTrace } from './tracekit';
 
-/** JSDoc */
-export function eventFromUnknownInput(
+/**
+ * Builds an Event from an Exception
+ */
+export function eventFromException(exception: unknown, hint?: EventHint): Event {
+  const syntheticException = (hint && (hint as any).syntheticException) || undefined;
+  const event = eventFromUnknownInput(exception, syntheticException, {
+    attachStacktrace: (hint as any)?.attachStacktrace,
+  });
+
+  addExceptionMechanism(event, {
+    handled: true,
+    type: 'generic',
+  });
+
+  event.level = 'error';
+
+  if (hint && hint.event_id) {
+    event.event_id = hint.event_id;
+  }
+
+  return event;
+}
+
+/**
+ * Builds an Event from a Message
+ */
+export function eventFromMessage(
+  message: string,
+  level: SeverityLevel = 'info',
+  hint?: EventHint
+): Event {
+  const syntheticException = (hint && (hint as any).syntheticException) || undefined;
+  const event = eventFromString(message, syntheticException, {
+    attachStacktrace: (hint as any)?.attachStacktrace,
+  });
+
+  event.level = level;
+
+  if (hint && hint.event_id) {
+    event.event_id = hint.event_id;
+  }
+
+  return event;
+}
+
+/**
+ * Builds an Event from an unknown input
+ */
+function eventFromUnknownInput(
   exception: unknown,
   syntheticException?: Error,
-  options: {
-    rejection?: boolean;
-    attachStacktrace?: boolean;
-  } = {},
+  options: { attachStacktrace?: boolean } = {}
 ): Event {
   let event: Event;
 
-  if (isErrorEvent(exception as ErrorEvent) && (exception as ErrorEvent).error) {
-    // If it is an ErrorEvent with `error` property, extract it to get actual Error
-    const errorEvent = exception as ErrorEvent;
-    exception = errorEvent.error; // tslint:disable-line:no-parameter-reassignment
-    event = eventFromStacktrace(computeStackTrace(exception as Error));
-    return event;
+  // Check if it's an ErrorEvent
+  if (typeof exception === 'object' && exception !== null && 'error' in exception) {
+    const errorEvent = exception as any;
+    if (errorEvent.error) {
+      exception = errorEvent.error;
+    }
   }
-  if (isDOMError(exception as DOMError) || isDOMException(exception as DOMException)) {
-    // If it is a DOMError or DOMException (which are legacy APIs, but still supported in some browsers)
-    // then we just extract the name and message, as they don't provide anything else
-    // https://developer.mozilla.org/en-US/docs/Web/API/DOMError
-    // https://developer.mozilla.org/en-US/docs/Web/API/DOMException
-    const domException = exception as DOMException;
-    const name = domException.name || (isDOMError(domException) ? 'DOMError' : 'DOMException');
-    const message = domException.message ? `${name}: ${domException.message}` : name;
 
-    event = eventFromString(message, syntheticException, options);
-    addExceptionTypeValue(event, message);
+  // Check if it's an Error
+  if (exception instanceof Error) {
+    event = eventFromStacktrace(exception);
     return event;
   }
-  if (isError(exception as Error)) {
-    // we have a real Error object, do nothing
-    event = eventFromStacktrace(computeStackTrace(exception as Error));
-    return event;
-  }
-  if (isPlainObject(exception) || isEvent(exception)) {
-    // If it is plain Object or Event, serialize it manually and extract options
-    // This will allow us to group events based on top-level keys
-    // which is much better than creating new group when any key/value change
-    const objectException = exception as {};
-    event = eventFromPlainObject(objectException, syntheticException, options.rejection);
+
+  // Check if it's a plain  object
+  if (typeof exception === 'object' && exception !== null) {
+    const objectException = exception as Record<string, unknown>;
+    event = eventFromPlainObject(objectException, syntheticException);
     addExceptionMechanism(event, {
       synthetic: true,
     });
     return event;
   }
 
-  // If none of previous checks were valid, then it means that it's not:
-  // - an instance of DOMError
-  // - an instance of DOMException
-  // - an instance of Event
-  // - an instance of Error
-  // - a valid ErrorEvent (one with an error property)
-  // - a plain Object
-  //
-  // So bail out and capture it as a simple message:
-  event = eventFromString(exception as string, syntheticException, options);
-  addExceptionTypeValue(event, `${exception}`, undefined);
+  // For everything else, treat as string
+  event = eventFromString(String(exception), syntheticException, options);
+  addExceptionTypeValue(event, String(exception), undefined);
   addExceptionMechanism(event, {
     synthetic: true,
   });
@@ -79,14 +93,13 @@ export function eventFromUnknownInput(
   return event;
 }
 
-// this._options.attachStacktrace
-/** JSDoc */
-export function eventFromString(
+/**
+ * Create event from string
+ */
+function eventFromString(
   input: string,
   syntheticException?: Error,
-  options: {
-    attachStacktrace?: boolean;
-  } = {},
+  options: { attachStacktrace?: boolean } = {}
 ): Event {
   const event: Event = {
     message: input,
@@ -95,10 +108,83 @@ export function eventFromString(
   if (options.attachStacktrace && syntheticException) {
     const stacktrace = computeStackTrace(syntheticException);
     const frames = prepareFramesForEvent(stacktrace.stack);
-    event.stacktrace = {
-      frames,
+    event.exception = {
+      values: [
+        {
+          value: input,
+          stacktrace: frames.length ? { frames: frames.reverse() } : undefined,
+        },
+      ],
     };
   }
 
   return event;
+}
+
+/**
+ * Create event from stacktrace
+ */
+function eventFromStacktrace(exception: Error): Event {
+  const stacktrace = computeStackTrace(exception);
+  const exceptionData = exceptionFromStacktrace(stacktrace);
+
+  const event: Event = {
+    exception: {
+      values: [exceptionData],
+    },
+  };
+
+  return event;
+}
+
+/**
+ * Create event from plain object
+ */
+function eventFromPlainObject(
+  exception: Record<string, unknown>,
+  syntheticException?: Error
+): Event {
+  const message = `Non-Error exception captured with keys: ${extractExceptionKeysForMessage(exception)}`;
+
+  const event: Event = {
+    exception: {
+      values: [
+        {
+          type: 'Error',
+          value: message,
+        },
+      ],
+    },
+    extra: {
+      __serialized__: normalizeToSize(exception),
+    },
+  };
+
+  if (syntheticException) {
+    const stacktrace = computeStackTrace(syntheticException);
+    const frames = prepareFramesForEvent(stacktrace.stack);
+    if (event.exception?.values?.[0]) {
+      event.exception.values[0].stacktrace = frames.length
+        ? { frames: frames.reverse() }
+        : undefined;
+    }
+  }
+
+  return event;
+}
+
+/**
+ * Prepare frames for event
+ */
+function prepareFramesForEvent(stack: any[]): StackFrame[] {
+  if (!stack || !stack.length) {
+    return [];
+  }
+
+  return stack.map((frame: any) => ({
+    filename: frame.url,
+    function: frame.func || '?',
+    lineno: frame.line,
+    colno: frame.column,
+  }));
 }

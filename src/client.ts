@@ -1,81 +1,104 @@
-import { BaseClient, Scope } from "@sentry/core";
-import { DsnLike, Event, EventHint } from "@sentry/types";
+// logger is not exported from core in v8, stays in utils or needs check
+// But based on user request, let's check other files. 
+// Actually, logger IS internal in v8 usually. Let's keep it if not deprecated or check specifically.
+// User specifically mentioned extractExceptionKeysForMessage, isEvent, normalizeToSize.
+// Let's stick to those for now, and check if logger is deprecated.
+import { BaseClient } from '@sentry/core';
+import type { ClientOptions, Event, EventHint, Scope, SeverityLevel } from '@sentry/core';
 
-import { MiniappBackend, MiniappOptions } from "./backend";
-import { SDK_NAME, SDK_VERSION } from "./version";
+import { eventFromException, eventFromMessage } from './eventbuilder';
+import { makeUniappTransport } from './transport';
 
 /**
- * All properties the report dialog supports
+ * Configuration options for the Uniapp SDK.
  */
-export interface ReportDialogOptions {
-  [key: string]: any;
-  eventId?: string;
-  dsn?: DsnLike;
-  user?: {
-    email?: string;
-    name?: string;
+export interface UniappOptions extends ClientOptions {
+  /**
+   * List of URLs to allow for error tracking.
+   */
+  allowUrls?: Array<string | RegExp>;
+
+  /**
+   * List of URLs to deny for error tracking.
+   */
+  denyUrls?: Array<string | RegExp>;
+
+  /**
+   * Extra options for global handlers integration
+   */
+  extraOptions?: {
+    onerror?: boolean;
+    onunhandledrejection?: boolean;
+    onpagenotfound?: boolean;
+    onmemorywarning?: boolean;
   };
-  lang?: string;
-  title?: string;
-  subtitle?: string;
-  subtitle2?: string;
-  labelName?: string;
-  labelEmail?: string;
-  labelComments?: string;
-  labelClose?: string;
-  labelSubmit?: string;
-  errorGeneric?: string;
-  errorFormEntry?: string;
-  successMessage?: string;
-  /** Callback after reportDialog showed up */
-  onLoad?(): void;
 }
 
 /**
- * The Sentry Miniapp SDK Client.
- *
- * @see MiniappOptions for documentation on configuration options.
- * @see SentryClient for usage documentation.
+ * The Sentry Uniapp SDK Client.
  */
-export class MiniappClient extends BaseClient<MiniappBackend, MiniappOptions> {
+export class UniappClient extends BaseClient<UniappOptions> {
   /**
-   * Creates a new Miniapp SDK instance.
-   *
-   * @param options Configuration options for this SDK.
+   * Creates a new Uniapp SDK instance.
    */
-  public constructor(options: MiniappOptions = {}) {
-    super(MiniappBackend, options);
+  public constructor(options: UniappOptions) {
+    // Set default transport if not provided
+    const clientOptions: UniappOptions = {
+      transport: makeUniappTransport,
+      ...options,
+    };
+
+    super(clientOptions);
   }
 
   /**
    * @inheritDoc
    */
-  protected _prepareEvent(event: Event, scope?: Scope, hint?: EventHint): PromiseLike<Event | null> {
-    event.platform = event.platform || "javascript";
+  protected _prepareEvent(
+    event: Event,
+    hint: EventHint,
+    scope?: Scope
+  ): PromiseLike<Event | null> {
+    // Set SDK info
     event.sdk = {
       ...event.sdk,
-      name: SDK_NAME,
+      name: 'sentry.javascript.uniapp',
       packages: [
         ...((event.sdk && event.sdk.packages) || []),
         {
-          name: "npm:sentry-uniapp",
-          version: SDK_VERSION
-        }
+          name: 'npm:sentry-uniapp',
+          version: this._options._metadata?.sdk?.version || '2.0.0',
+        },
       ],
-      version: SDK_VERSION
+      version: this._options._metadata?.sdk?.version || '2.0.0',
     };
 
-    return super._prepareEvent(event, scope, hint);
+    return super._prepareEvent(event, hint, scope);
   }
 
   /**
-   * Show a report dialog to the user to send feedback to a specific event.
-   * 向用户显示报告对话框以将反馈发送到特定事件。---> 小程序上暂时用不到&不考虑。
-   *
-   * @param options Set individual options for the dialog
+   * Create an event from an exception.
    */
-  public showReportDialog(options: ReportDialogOptions = {}): void {
-    // doesn't work without a document (React Native)
-    console.log('sentry-uniapp 暂未实现该方法', options);
+  public eventFromException(exception: any, hint?: EventHint): PromiseLike<Event> {
+    return Promise.resolve(eventFromException(exception, hint));
   }
+
+  /**
+   * Create an event from a message.
+   */
+  public eventFromMessage(
+    message: string,
+    level: SeverityLevel = 'info',
+    hint?: EventHint
+  ): PromiseLike<Event> {
+    return Promise.resolve(eventFromMessage(message, level, hint));
+  }
+}
+
+/**
+ * Options for showing the report dialog (not supported in miniapp environment)
+ */
+export interface ReportDialogOptions {
+  eventId?: string;
+  [key: string]: any;
 }

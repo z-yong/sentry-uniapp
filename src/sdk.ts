@@ -1,167 +1,97 @@
 import {
-  getCurrentHub,
-  initAndBind,
-  Integrations as CoreIntegrations,
-} from "@sentry/core";
-import { resolvedSyncPromise } from "@sentry/utils";
+  inboundFiltersIntegration,
+  functionToStringIntegration,
+  linkedErrorsIntegration,
+  dedupeIntegration,
+  getClient,
+  getCurrentScope,
+} from '@sentry/core';
+import { createStackParser, nodeStackLineParser } from '@sentry/core';
+import type { Integration, StackParser } from '@sentry/core';
 
-import { MiniappOptions } from "./backend";
-import { MiniappClient, ReportDialogOptions } from "./client";
-import { wrap as internalWrap } from "./helpers";
+import { UniappClient, UniappOptions, ReportDialogOptions } from './client';
+import { makeUniappTransport } from './transport';
 import {
-  GlobalHandlers,
-  IgnoreMpcrawlerErrors,
-  LinkedErrors,
-  Router,
-  System,
-  TryCatch,
-} from "./integrations/index";
+  globalHandlersIntegration,
+  systemIntegration,
+  routerIntegration,
+} from './integrations';
 
-export const defaultIntegrations = [
-  new CoreIntegrations.InboundFilters(),
-  new CoreIntegrations.FunctionToString(),
-  new TryCatch(),
-  new GlobalHandlers(),
-  new LinkedErrors(),
+/** Get the default integrations for the Uniapp SDK. */
+function getDefaultIntegrations(options: UniappOptions): Integration[] {
+  const integrations = [
+    inboundFiltersIntegration(),
+    functionToStringIntegration(),
+    linkedErrorsIntegration(),
+    dedupeIntegration(),
+    globalHandlersIntegration(options.extraOptions),
+    systemIntegration(),
+    routerIntegration(),
+  ];
 
-  new System(),
-  new Router(),
-  new IgnoreMpcrawlerErrors(),
-];
+  return integrations;
+}
 
 /**
- * The Sentry Uniapp SDK Client.
- *
- * To use this SDK, call the {@link init} function as early as possible when
- * launching the app. To set context information or send manual events, use
- * the provided methods.
- *
- * @example
- * ```
- * import { init } from 'sentry-uniapp';
- *
- * init({
- *   dsn: '__DSN__',
- *   // ...
- * });
- * ```
- *
- * @example
- * ```
- * import { configureScope } from 'sentry-uniapp';
- *
- * configureScope((scope: Scope) => {
- *   scope.setExtra({ battery: 0.7 });
- *   scope.setTag({ user_mode: 'admin' });
- *   scope.setUser({ id: '4711' });
- * });
- * ```
- *
- * @example
- * ```
- * import { addBreadcrumb } from 'sentry-uniapp';
- *
- * addBreadcrumb({
- *   message: 'My Breadcrumb',
- *   // ...
- * });
- * ```
- *
- * @example
- * ```
- * import * as Sentry from 'sentry-uniapp';
- *
- * Sentry.captureMessage('Hello, world!');
- * Sentry.captureException(new Error('Good bye'));
- * Sentry.captureEvent({
- *   message: 'Manual',
- *   stacktrace: [
- *     // ...
- *   ],
- * });
- * ```
- *
- * @see {@link MiniappOptions} for documentation on configuration options.
+ * Initialize the Sentry Uniapp SDK.
  */
-export function init(options: MiniappOptions = {}): void {
-  // 如果将 options.defaultIntegrations 设置为 false，则不会添加默认集成，否则将在内部将其设置为建议的默认集成。
-  // tslint:disable-next-line: strict-comparisons
-  if (options.defaultIntegrations === undefined) {
-    options.defaultIntegrations = defaultIntegrations;
+export function init(options: Partial<UniappOptions> = {}): void {
+  const finalOptions: UniappOptions = {
+    stackParser: createStackParser(nodeStackLineParser()),
+    transport: makeUniappTransport,
+    integrations: [],
+    ...options,
+  };
+
+  // Set default integrations if not provided
+  if (!options.integrations) {
+    finalOptions.integrations = getDefaultIntegrations(finalOptions);
   }
 
-  options.normalizeDepth = options.normalizeDepth || 5;
-  if (options.defaultIntegrations) {
-    (options.defaultIntegrations[3] as GlobalHandlers).setExtraOptions(options.extraOptions);
-  }
+  const client = new UniappClient(finalOptions);
+  const scope = getCurrentScope();
 
-  initAndBind(MiniappClient, options);
+  scope.setClient(client);
+  client.init();
 }
 
 /**
  * Present the user with a report dialog.
- * 向用户显示报告对话框。小程序上暂时不考虑实现该功能。
- *
- * @param options Everything is optional, we try to fetch all info need from the global scope.
+ * Not supported in miniapp environment - this is a no-op.
  */
 export function showReportDialog(options: ReportDialogOptions = {}): void {
-  if (!options.eventId) {
-    options.eventId = getCurrentHub().lastEventId();
-  }
-  const client = getCurrentHub().getClient<MiniappClient>();
-  if (client) {
-    client.showReportDialog(options);
+  // Not supported in miniapp environment
+  if (typeof console !== 'undefined' && console.warn) {
+    console.warn('sentry-uniapp: showReportDialog is not supported in miniapp environment');
   }
 }
 
 /**
- * This is the getter for lastEventId. 获取 lastEventId。
- *
- * @returns The last event id of a captured event.
+ * Get the last event ID captured.
  */
 export function lastEventId(): string | undefined {
-  return getCurrentHub().lastEventId();
+  const scope = getCurrentScope();
+  return scope.lastEventId();
 }
 
 /**
- * A promise that resolves when all current events have been sent.
- * If you provide a timeout and the queue takes longer to drain the promise returns false.
- * 在发送所有当前事件时会变为 resolved 状态的 promise。如果提供了一个超时时间并且队列需要更长时间来消耗，则 promise 将返回 false。
- *
- * @param timeout Maximum time in ms the client should wait.
+ * Flush all pending events.
  */
-export function flush(timeout?: number): PromiseLike<boolean> {
-  const client = getCurrentHub().getClient<MiniappClient>();
+export async function flush(timeout?: number): Promise<boolean> {
+  const client = getClient<UniappClient>();
   if (client) {
     return client.flush(timeout);
   }
-  return resolvedSyncPromise(false);
+  return Promise.resolve(false);
 }
 
 /**
- * A promise that resolves when all current events have been sent.
- * If you provide a timeout and the queue takes longer to drain the promise returns false.
- *
- * @param timeout Maximum time in ms the client should wait.
+ * Close the SDK and flush all pending events.
  */
-export function close(timeout?: number): PromiseLike<boolean> {
-  const client = getCurrentHub().getClient<MiniappClient>();
+export async function close(timeout?: number): Promise<boolean> {
+  const client = getClient<UniappClient>();
   if (client) {
     return client.close(timeout);
   }
-  return resolvedSyncPromise(false);
-}
-
-/**
- * Wrap code within a try/catch block so the SDK is able to capture errors.
- * 在 try / catch 块中包装代码，以便 SDK 能够捕获错误。
- * 实际上是 ./helpers 文件中 warp 方法的进一步封装。
- *
- * @param fn A function to wrap.
- *
- * @returns The result of wrapped function call.
- */
-export function wrap(fn: Function): any {
-  // tslint:disable-next-line: no-unsafe-any
-  return internalWrap(fn)();
+  return Promise.resolve(false);
 }
