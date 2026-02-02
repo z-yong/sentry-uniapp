@@ -8,17 +8,19 @@ export default {
     sentry.init({
       // __DSN__ 参考格式: https://8137b89b2d1c4e349da3a38dca80c5fe@sentry.io/1
       dsn: 'https://25c181fa4b9875396c29fb0e0cb83f8b@o4508364745932800.ingest.de.sentry.io/4510810903216208',
+      release: 'uappx@1.0.0',  // 必须与上传的 release 名称一致
+      dist: 'h5',               // 必须与上传的 dist 一致
       tracesSampleRate: 1.0,
-      // extraOptions: { onmemorywarning: false, onerror: false }
+      debug: true,  // 启用调试日志
     });
 
     // 性能监控测试：手动启动一个 Span
     sentry.startSpan({ name: 'test-transaction', op: 'test.load' }, (span) => {
-        console.log('Starting test transaction...');
-        setTimeout(() => {
-            span.end();
-            console.log('Test transaction finished and sent!');
-        }, 2000);
+      console.log('Starting test transaction...');
+      setTimeout(() => {
+        span.end();
+        console.log('Test transaction finished and sent!');
+      }, 2000);
     });
 
     // 代码上报，extra 为可选的自定义对象内容
@@ -28,7 +30,12 @@ export default {
     });
 
     // 触发一个未定义函数的错误
-    balabala();
+    try {
+      balabala();
+    } catch (e) {
+      console.log(e)
+      sentry.captureException(e);
+    }
   },
 
   // sentry-uniapp 内部是通过 uni.onError 钩子函数捕获错误的
@@ -37,9 +44,8 @@ export default {
   //
   // 通用方案：
   // 可用 App.onError 自己处理，但需要先禁用 sentry 里的捕获
-  // 方法在 sentry.init 参数里加上 extraOptions: { onerror: false }
   onError: function (e) {
-    sentry.captureException(e);
+    // sentry.captureException(e);
   },
 
   onShow: function () {

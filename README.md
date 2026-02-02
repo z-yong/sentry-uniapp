@@ -29,10 +29,10 @@ export default {
       sentry.init({
          // __DSN__ 参考格式: https://8137b89b2d1c4e349da3a38dca80c5fe@sentry.io/1
          dsn: '__DSN__',
-
-         // extraOptions 主要是解决平台差异问题的，见下方说明
-         // 非 APP 平台，可以不用
-         extraOptions: { onmemorywarning: false, onerror: false }
+         release: 'uappx@1.0.0',  // sourcemap功能，必须与上传的 release 名称一致
+         dist: 'h5',              // sourcemap功能，必须与上传的 dist 一致
+         tracesSampleRate: 1.0,   // performance monitoring, 按需开启
+         debug: true,             // 启用调试日志, 按需开启
       });
 
       // 代码上报，extra 为可选的自定义对象内容
@@ -92,11 +92,89 @@ export default {
    });
 ```
 
+## SourceMap 支持
+
+为了在生产环境中将压缩/混淆后的错误堆栈还原为原始源代码位置，可以配置 SourceMap 上传到 Sentry。
+
+### 快速开始
+
+1. **配置 Sentry 认证**
+
+   创建 `.sentryclirc` 文件：
+   ```bash
+   cd uapp-demo
+   cp .sentryclirc.example .sentryclirc
+   ```
+
+   编辑 `.sentryclirc` 并填入你的 Sentry Auth Token：
+   ```ini
+   [auth]
+   token=YOUR_SENTRY_AUTH_TOKEN  # 从 Sentry 获取
+
+   [defaults]
+   org=your-org-slug
+   project=your-project-slug
+   url=https://sentry.io/  # 或你的 Sentry 服务器地址
+   ```
+
+2. **启用 SourceMap 生成**
+
+   确保 `vite.config.js` 中启用了 sourcemap：
+   ```javascript
+   // uapp-demo/vite.config.js
+   export default defineConfig({
+     build: {
+       sourcemap: true,  // 生成 SourceMap 文件
+     },
+   });
+   ```
+
+3. **在代码中设置 Release**
+
+   修改 `App.vue` 的 `sentry.init` 配置：
+   ```javascript
+   sentry.init({
+     dsn: '__DSN__',
+     release: 'uappx@1.0.0',  // 与 package.json version 保持一致
+     dist: 'h5',               // 平台标识：h5, android, ios 等
+   });
+   ```
+
+4. **上传 sourcemap**
+
+   ```bash
+   # H5 平台（完整支持）
+   npm run upload:sourcemaps:h5
+   ```
+
+### 平台支持情况
+
+| 平台 | SourceMap 生成 | 推荐程度 |
+|-----|--------------|---------|
+| **H5** | ✅ 独立 .map 文件 | ⭐⭐⭐⭐⭐ 完整支持 |
+| **App (Android/iOS)** | ⚠️ 内联 base64 | ⭐ 不支持 |
+| **微信小程序** | ⚠️ 内联 base64 | ⭐⭐ 开发支持，需禁用小程序IDE二次编译压缩 |
+
+### 详细文档
+
+完整的 SourceMap 配置、上传、验证指南，请查看：
+
+📖 **[SOURCEMAP_GUIDE.md](./SOURCEMAP_GUIDE.md)**
+
+包含内容：
+- Sentry Auth Token 获取方法
+- 多平台上传配置
+- CI/CD 集成方案
+- 故障排查步骤
+- 验证 SourceMap 是否生效
+
 ## 参考示例
 
 项目代码里的 `uapp-demo`，通过 HBuilderX 打开即可，下面截图为 `uapp-demo` 在各平台测试结果。
 
 ![pass](./assets/sentry-screetshot.png)
+
+`uapp-demo` 项目已集成 SourceMap 上传功能，详见 [SOURCEMAP_GUIDE.md](./SOURCEMAP_GUIDE.md)
 
 ## 常见问题
 
@@ -109,31 +187,7 @@ export default {
 * 可检测 `__DSN__` 是否正确
 * 检测网络，最好通过配置代理拦截下网络请求是否存在
 
-2、提示 onmemorywarning 未实现错误
-
-> API `onMemoryWarning` is not yet implemented __ERROR
-
-有的平台不支持 `memorywarning` 的监听，可以 sentry.init 里禁用:
-
-```.js
-   sentry.init({
-      dsn: '__DSN__',
-      extraOptions: { onmemorywarning: false }
-   });
-```
-
-3、暂不支持 sentry.init 开启 debug，移除 或设置 false
-
-> [Vue warn]: Error in onLaunch hook: "TypeError: undefined is not an object (evaluating '(_a = global.console)[name]')"[ERROR] : [Vue warn]: Error in onLaunch hook: "TypeError: undefined is not an object (evaluating '(_a = global.console)[name]')"(found at App.vue:1) __ERROR
-
-```.js
-   sentry.init({
-      dsn: '__DSN__',
-      debug: false,
-   });
-```
-
-4、代码异常没有自动上报的，可查看 HBuilderX 的 log 窗口，区分以下两种错误情况
+2、代码异常没有自动上报的，可查看 HBuilderX 的 log 窗口，区分以下两种错误情况
 
 [JS Framework] 开头，由 framewrok 底层拦截 `不会触发 sentry 上报`，错误信息如下:
 
@@ -175,6 +229,6 @@ Vue 层报的错误，可以触发 sentry 上报，错误信息如下:
 
 推荐另一个开源作品 `uapp`, 方便 Uniapp 离线打包的 cli。  
 
-<https://github.com/uappkit/uapp>
+<https://github.com/uappx/uapp>
 
 ![uapp](./uapp-demo/static/logo.png)

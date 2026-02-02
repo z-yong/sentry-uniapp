@@ -1,0 +1,17 @@
+# Sentry CLI 配置示例
+# 复制此文件为 .sentryclirc 并填入你的真实信息
+# 注意：.sentryclirc 不应提交到版本控制
+
+[auth]
+token=YOUR_SENTRY_AUTH_TOKEN
+
+[defaults]
+org=your-org-slug
+project=your-project-slug
+url=https://sentry.io/
+
+# 获取 Auth Token:
+# 1. 登录 Sentry
+# 2. Settings → Account → API → Auth Tokens
+# 3. Create New Token
+# 4. 需要的权限：project:releases, project:write

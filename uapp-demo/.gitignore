@@ -1,0 +1,34 @@
+# 忽略 Sentry CLI 配置文件（包含敏感信息）
+.sentryclirc
+
+# 忽略环境变量文件
+.env
+.env.local
+.env.*.local
+
+# Node modules
+node_modules/
+
+# 构建输出
+unpackage/
+dist/
+
+# 编辑器配置
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 日志文件
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# SourceMap 文件（已上传到 Sentry，不需要提交）
+*.map
