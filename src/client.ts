@@ -8,6 +8,7 @@ import type { ClientOptions, Event, EventHint, Scope, SeverityLevel } from '@sen
 
 import { eventFromException, eventFromMessage } from './eventbuilder';
 import { makeUniappTransport } from './transport';
+import { SDK_NAME, SDK_VERSION } from './version';
 
 /**
  * Configuration options for the Uniapp SDK.
@@ -61,16 +62,14 @@ export class UniappClient extends BaseClient<UniappOptions> {
   ): PromiseLike<Event | null> {
     // Set SDK info
     event.sdk = {
-      ...event.sdk,
-      name: 'sentry.javascript.uniapp',
+      name: SDK_NAME,
       packages: [
-        ...((event.sdk && event.sdk.packages) || []),
         {
           name: 'npm:sentry-uniapp',
-          version: this._options._metadata?.sdk?.version || '2.0.0',
+          version: SDK_VERSION,
         },
       ],
-      version: this._options._metadata?.sdk?.version || '2.0.0',
+      version: SDK_VERSION,
     };
 
     return super._prepareEvent(event, hint, scope);

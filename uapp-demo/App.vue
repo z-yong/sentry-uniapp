@@ -8,9 +8,17 @@ export default {
     sentry.init({
       // __DSN__ 参考格式: https://8137b89b2d1c4e349da3a38dca80c5fe@sentry.io/1
       dsn: 'https://25c181fa4b9875396c29fb0e0cb83f8b@o4508364745932800.ingest.de.sentry.io/4510810903216208',
-      // extraOptions 主要是解决平台差异问题的，见下方说明
-      // 非 APP 平台，可以不实用
-      extraOptions: { onmemorywarning: false, onerror: false }
+      tracesSampleRate: 1.0,
+      // extraOptions: { onmemorywarning: false, onerror: false }
+    });
+
+    // 性能监控测试：手动启动一个 Span
+    sentry.startSpan({ name: 'test-transaction', op: 'test.load' }, (span) => {
+        console.log('Starting test transaction...');
+        setTimeout(() => {
+            span.end();
+            console.log('Test transaction finished and sent!');
+        }, 2000);
     });
 
     // 代码上报，extra 为可选的自定义对象内容

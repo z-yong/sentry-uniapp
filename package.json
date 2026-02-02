@@ -4,10 +4,10 @@
   "description": "用于Uniapp/小程序/快应用等平台的 Sentry SDK",
   "repository": "git://github.com/uappx/sentry-uniapp.git",
   "homepage": "https://github.com/uappx/sentry-uniapp",
-  "main": "dist/src/index.js",
-  "module": "esm/src/index.js",
+  "main": "dist/index.js",
+  "module": "esm/index.js",
   "miniprogram": "dist",
-  "types": "dist/src/index.d.ts",
+  "types": "dist/index.d.ts",
   "keywords": [
     "sentry",
     "uniapp",
@@ -19,7 +19,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "clean": "rm -rf dist esm",
-    "build": "npm-run-all clean --parallel build:dist build:esm build:ts version",
+    "build": "npm-run-all clean version --parallel build:dist build:esm build:ts",
     "build:dist": "tsc -p tsconfig.json",
     "build:ts": "tsc -p tsconfig.json",
     "build:esm": "tsc -p tsconfig.esm.json",

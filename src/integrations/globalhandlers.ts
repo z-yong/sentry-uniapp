@@ -1,7 +1,6 @@
 import { defineIntegration, captureException, captureMessage, getCurrentScope } from '@sentry/core';
 import type { Integration, IntegrationFn } from '@sentry/core';
 import { logger } from '@sentry/core';
-
 import { sdk } from '../crossPlatform';
 
 const INTEGRATION_NAME = 'GlobalHandlers';
