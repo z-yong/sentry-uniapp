@@ -8,7 +8,7 @@
 
 快应用项目可参考：
 
-<https://github.com/uappkit/sentry-quickapp>
+<https://github.com/uappx/sentry-quickapp>
 
 ## 用法
 

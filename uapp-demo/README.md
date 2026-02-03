@@ -110,12 +110,12 @@ uni.$uv.http.upload('/api/video/mixcut', {
 
 `npm i sentry-uniapp`
 
-<https://github.com/uappkit/sentry-uniapp>
+<https://github.com/uappx/sentry-uniapp>
 
 ### 5. 参考
 
 uapp 文档，方便 uni-app 跨平台快速开发的 cli  
-<https://github.com/uappkit/uapp>
+<https://github.com/uappx/uapp>
 
 tailwindcss 文档  
 <https://tailwindcss.com/docs/container>

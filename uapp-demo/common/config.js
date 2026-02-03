@@ -1,6 +1,6 @@
 /**
  * Author: Qisen Yz <yinqisen@gmail.com>
- * Github: https://github.com/uappkit/uapp
+ * Github: https://github.com/uappx/uapp
  *
  * Copyright(c) 2022 - 2024, uapp.dev
  */
