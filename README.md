@@ -5,7 +5,7 @@
 同时支持 Uniapp vue2 / vue3 工程。
 
 > 提示：由于快应用 require 方式特殊性，webpack是在编译期处理的，动态代码检测无效，所以单独维护，包名为 sentry-quickapp。
- 
+
 快应用项目可参考：
 
 <https://github.com/uappkit/sentry-quickapp>
@@ -78,12 +78,12 @@ export default {
    // Capture exceptions, messages or manual events
    // Error 无法定义标题，可以用下面的 captureMessage
    sentry.captureException(new Error("Good bye"));
- 
+
    // captureMessage 可以定制消息标题，extra 为附加的对象内容
    sentry.captureMessage("message title", {
      extra
    });
- 
+
    sentry.captureEvent({
      message: "Manual",
      stacktrace: [
@@ -149,11 +149,11 @@ export default {
 
 ### 平台支持情况
 
-| 平台 | SourceMap 生成 | 推荐程度 |
-|-----|--------------|---------|
-| **H5** | ✅ 独立 .map 文件 | ⭐⭐⭐⭐⭐ 完整支持 |
-| **App (Android/iOS)** | ⚠️ 内联 base64 | ⭐ 不支持 |
-| **微信小程序** | ⚠️ 内联 base64 | ⭐⭐ 开发支持，需禁用小程序IDE二次编译压缩 |
+| 平台                    | SourceMap 生成 | 支持程度                            |
+|-----------------------|--------------|---------------------------------|
+| **H5**                | ✅ 独立 .map 文件 | ⭐⭐⭐⭐⭐ 完整支持                      |
+| **微信小程序**             | ✅ 独立 .map 文件 | ⭐⭐ 要避免小程序二次编译压缩                 |
+| **App (Android/iOS)** | ⚠️ 内联 base64 | ⭐ 手动解码并创建 app-service.js.map 文件 |
 
 ### 详细文档
 
@@ -227,7 +227,7 @@ Vue 层报的错误，可以触发 sentry 上报，错误信息如下:
 
 微信: yinqisen
 
-推荐另一个开源作品 `uapp`, 方便 Uniapp 离线打包的 cli。  
+推荐另一个开源作品 `uapp`, 方便 Uniapp 离线打包的 cli。
 
 <https://github.com/uappx/uapp>
 
