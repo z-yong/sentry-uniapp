@@ -1,17 +1,20 @@
 <script>
 
 import * as sentry from 'sentry-uniapp';
+import { SENTRY_RELEASE } from './sentry.release.js';
 
 export default {
   onLaunch: function () {
-    console.log('App Launch');
+    const dist = process.env.UNI_PLATFORM;
+    console.log('App Launch, dist = ' + dist);
+
     sentry.init({
       // __DSN__ 参考格式: https://8137b89b2d1c4e349da3a38dca80c5fe@sentry.io/1
       dsn: 'https://25c181fa4b9875396c29fb0e0cb83f8b@o4508364745932800.ingest.de.sentry.io/4510810903216208',
-      release: 'uappx@1.0.0',  // 必须与上传的 release 名称一致
-      dist: 'h5',               // 必须与上传的 dist 一致
+      release: SENTRY_RELEASE,
+      dist,
       tracesSampleRate: 1.0,
-      debug: true,  // 启用调试日志
+      debug: true  // 启用调试日志
     });
 
     // 性能监控测试：手动启动一个 Span
@@ -33,7 +36,7 @@ export default {
     try {
       balabala();
     } catch (e) {
-      console.log(e)
+      console.log(e);
       sentry.captureException(e);
     }
   },

@@ -1,107 +1,95 @@
 #!/usr/bin/env node
 
 /**
- * 上传 SourceMaps 到 Sentry
- * 
- * 使用方法：
- * 1. 设置环境变量：
- *    export SENTRY_AUTH_TOKEN=your_token
- *    export SENTRY_ORG=your-org
- *    export SENTRY_PROJECT=your-project
- * 
- * 2. 或创建 .sentryclirc 文件（推荐）
- * 
- * 3. 运行：npm run upload:sourcemaps
+ * Upload SourceMaps to Sentry (works for h5 and mp-weixin).
+ *
+ * Environment:
+ *   SENTRY_AUTH_TOKEN (required unless .sentryclirc is used)
+ *   SENTRY_ORG
+ *   SENTRY_PROJECT
+ *   SENTRY_RELEASE (optional, fallback to ./sentry.release.js or package.json)
+ *   PLATFORM (optional: h5, mp-weixin, android, ios; default: h5)
+ *   SENTRY_DIST (optional: overrides dist, default = PLATFORM)
+ *   SENTRY_URL_PREFIX (optional)
+ *   SENTRY_STRIP_PREFIX (optional)
+ *   SENTRY_URL (optional: for self-hosted)
  */
 
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-// 读取版本信息
 const packageJson = require('../package.json');
-const release = `${packageJson.name}@${packageJson.version}`;
+let release = process.env.SENTRY_RELEASE;
+try {
+  const releaseFile = require('../sentry.release.js');
+  if (!release && releaseFile && releaseFile.SENTRY_RELEASE) {
+    release = releaseFile.SENTRY_RELEASE;
+  }
+} catch (e) {
+  // ignore
+}
+if (!release) {
+  release = `${packageJson.name}@${packageJson.version}`;
+}
 
-// 获取平台和环境
-const platform = process.env.PLATFORM || 'android'; // android, ios, h5, mp-weixin
-const environment = process.env.ENVIRONMENT || 'production';
+const platform = process.env.PLATFORM || 'h5';
+const dist = process.env.SENTRY_DIST || platform;
 
-// 根据平台确定 sourcemap 路径
 const sourcemapPaths = {
-  'android': './unpackage/dist/dev/app-plus',
-  'ios': './unpackage/dist/dev/app-plus',
-  'h5': './unpackage/dist/build/h5',
-  'mp-weixin': './unpackage/dist/dev/mp-weixin',
+  h5: './unpackage/dist/build/h5',
+  'mp-weixin': './unpackage/dist/dev/mp-weixin'
 };
 
 const sourcemapPath = sourcemapPaths[platform];
-
 if (!sourcemapPath) {
   console.error(`❌ Unknown platform: ${platform}`);
   process.exit(1);
 }
 
-// 检查路径是否存在
-if (!fs.existsSync(sourcemapPath)) {
-  console.error(`❌ SourceMap path not found: ${sourcemapPath}`);
+const absolutePath = path.resolve(__dirname, '..', sourcemapPath);
+if (!fs.existsSync(absolutePath)) {
+  console.error(`❌ SourceMap path not found: ${absolutePath}`);
   console.error('Please build the project first.');
   process.exit(1);
 }
 
+const urlPrefix =
+  process.env.SENTRY_URL_PREFIX ||
+  (platform === 'mp-weixin' ? '~/appservice' : platform === 'h5' ? '~/assets' : undefined);
+const stripPrefix = process.env.SENTRY_STRIP_PREFIX || sourcemapPath;
+
 console.log('📦 Uploading SourceMaps to Sentry...');
 console.log(`   Release: ${release}`);
 console.log(`   Platform: ${platform}`);
-console.log(`   Environment: ${environment}`);
+console.log(`   Dist: ${dist}`);
 console.log(`   Path: ${sourcemapPath}`);
+if (urlPrefix) console.log(`   Url Prefix: ${urlPrefix}`);
+if (stripPrefix) console.log(`   Strip Prefix: ${stripPrefix}`);
 console.log('');
 
 try {
-  // 1. 创建 Release
   console.log('1️⃣ Creating release...');
-  execSync(`npx @sentry/cli releases new ${release}`, { 
-    stdio: 'inherit',
-    env: process.env 
-  });
+  execSync(`npx @sentry/cli releases new ${release}`, { stdio: 'inherit', env: process.env });
 
-  // 2. 上传 SourceMaps（新版 CLI 命令格式）
   console.log('\n2️⃣ Uploading source maps...');
-  execSync(
-    `npx @sentry/cli sourcemaps upload ` +
-    `--release ${release} ` +
-    `--dist ${platform} ` +
-    `${sourcemapPath}`,
-    { 
-      stdio: 'inherit',
-      env: process.env 
-    }
-  );
+  const cmdParts = [
+    'npx @sentry/cli sourcemaps upload',
+    `--release ${release}`,
+    `--dist ${dist}`,
+    urlPrefix ? `--url-prefix "${urlPrefix}"` : '',
+    stripPrefix ? `--strip-prefix "${stripPrefix}"` : '',
+    '--rewrite',
+    sourcemapPath
+  ].filter(Boolean);
+  execSync(cmdParts.join(' '), { stdio: 'inherit', env: process.env });
 
-  // 3. 设置 Release 的部署信息
-  console.log('\n3️⃣ Setting deploy info...');
-  execSync(
-    `npx @sentry/cli releases deploys ${release} new -e ${environment}`,
-    { 
-      stdio: 'inherit',
-      env: process.env 
-    }
-  );
-
-  // 4. Finalize Release
-  console.log('\n4️⃣ Finalizing release...');
-  execSync(`npx @sentry/cli releases finalize ${release}`, { 
-    stdio: 'inherit',
-    env: process.env 
-  });
+  console.log('\n3️⃣ Finalizing release...');
+  execSync(`npx @sentry/cli releases finalize ${release}`, { stdio: 'inherit', env: process.env });
 
   console.log(`\n✅ SourceMaps uploaded successfully for release: ${release}`);
-  console.log(`   View in Sentry: https://sentry.io/organizations/YOUR_ORG/releases/${release}/\n`);
-
 } catch (error) {
   console.error('\n❌ Failed to upload SourceMaps');
-  console.error('Error:', error.message);
-  console.log('\nTroubleshooting:');
-  console.log('1. Check if SENTRY_AUTH_TOKEN is set');
-  console.log('2. Verify .sentryclirc configuration');
-  console.log('3. Ensure you have proper permissions');
+  console.error('Error:', error && error.message ? error.message : error);
   process.exit(1);
 }

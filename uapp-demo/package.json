@@ -5,17 +5,15 @@
   "main": "main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "upload:sourcemaps": "node scripts/upload-sourcemaps.js",
-    "upload:sourcemaps:android": "PLATFORM=android node scripts/upload-sourcemaps.js",
-    "upload:sourcemaps:h5": "PLATFORM=h5 node scripts/upload-sourcemaps.js",
-    "upload:sourcemaps:mp-weixin": "PLATFORM=mp-weixin node scripts/uploadourcemaps.js"
+    "upload:sourcemaps:mp-weixin": "PLATFORM=mp-weixin node scripts/upload-sourcemaps.js"
   },
   "author": "Yin Qisen <yinqisen@gmail.com>",
   "license": "Apache-2.0",
   "dependencies": {
     "@climblee/uv-ui": "^1.1.20",
+    "@sentry/vite-plugin": "^4.9.0",
     "@uni-helper/unocss-preset-uni": "^0.2.7",
-    "sentry-uniapp": "^2.8.2"
+    "sentry-uniapp": "^2.8.5"
   },
   "devDependencies": {
     "@sentry/cli": "^3.1.0"
