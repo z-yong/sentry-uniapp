@@ -33,8 +33,8 @@ const _routerIntegration = ((options: RouterOptions = {}) => {
           contexts: {
             ...event.contexts,
             router: {
-              routes: routers,
-              current: routers[routers.length - 1],
+              routes: JSON.stringify(routers),
+              current: JSON.stringify(routers[routers.length - 1]),
             },
           },
         };
